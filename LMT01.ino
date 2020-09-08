@@ -38,14 +38,24 @@ boolean getLMT01() {
   attachInterrupt(LMT01_Data_Pin, pulseCounter, FALLING);
 
   int lastPulseCount = 0;
-  for (int i = 0; i < 5; i++) {
+  int goodPulsesInRow = 0;
+  for (int i = 0; i < 20; i++) {//gonna try 20 times until we hit 5 in a row
     getPulses();
     Serial.print("pulse=");
     Serial.println(pulseCount);
-    if (pulseCount < (lastPulseCount + 10) && pulseCount  > (lastPulseCount - 10))//if temperature reading looks strange, keep going  till you get two in a row
-      break;
+    if (pulseCount < (lastPulseCount + 10) && pulseCount  > (lastPulseCount - 10)) { //if temperature reading looks strange, keep going  till you get two in a row
+      goodPulsesInRow++;
+      if (goodPulsesInRow == 5) {
+        Serial.println("Found 5 in a row!");
+        break;
+      }
+    }
+    else if (i > 0) {//just since it would fail on first reading
+      goodPulsesInRow = 0;
+      Serial.println("FAIL!! starting count over");
+    }
     lastPulseCount = pulseCount;
-    if (i == 4) {
+    if (i == 19) {//all the way through and never found 5 good ones in a row
       Serial.println("Could not find temp");
       delay(10);
       return false;
