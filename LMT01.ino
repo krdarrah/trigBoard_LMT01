@@ -1,10 +1,18 @@
 
 
-const int LMT01_Data_Pin = 13;//low side, where we catch the pulses with the ADC
+const int LMT01_Data_Pin = 13;//low side, where we catch the pulses
+const int LMT01_Power_Pin = 12;
 volatile uint16_t pulseCount = 0;
 
+void IRAM_ATTR pulseCounter() {
+  pulseCount++;
+}
 
 void getPulses() {
+  pinMode(LMT01_Power_Pin, OUTPUT);
+  digitalWrite(LMT01_Power_Pin, HIGH);
+  pinMode(LMT01_Data_Pin, INPUT_PULLUP);
+  attachInterrupt(LMT01_Data_Pin, pulseCounter, FALLING);
   //Serial.println("temp configured");
   //wait for 54ms timeout
   pulseCount = 0;
@@ -26,24 +34,24 @@ void getPulses() {
     }
 
   }
-
+  detachInterrupt(LMT01_Data_Pin);
+  digitalWrite(LMT01_Power_Pin, LOW);
+  pinMode(LMT01_Data_Pin, INPUT);
 }
 
-void IRAM_ATTR pulseCounter() {
-  pulseCount++;
-}
+
 
 boolean getLMT01() {
-  pinMode(LMT01_Data_Pin, INPUT_PULLUP);
-  attachInterrupt(LMT01_Data_Pin, pulseCounter, FALLING);
-
+  unsigned long getLMT01startTime = millis();
   int lastPulseCount = 0;
   int goodPulsesInRow = 0;
-  for (int i = 0; i < 20; i++) {//gonna try 20 times until we hit 5 in a row
+  for (int i = 0; i < 20; i++) {
     getPulses();
     Serial.print("pulse=");
-    Serial.println(pulseCount);
-    if (pulseCount < (lastPulseCount + 10) && pulseCount  > (lastPulseCount - 10)) { //if temperature reading looks strange, keep going  till you get two in a row
+    Serial.print(pulseCount);
+    Serial.print(" vs last ");
+    Serial.println(lastPulseCount);
+    if (pulseCount < (lastPulseCount + 10) && pulseCount  > (lastPulseCount - 10)) { //
       goodPulsesInRow++;
       if (goodPulsesInRow == 5) {
         Serial.println("Found 5 in a row!");
@@ -53,6 +61,7 @@ boolean getLMT01() {
     else if (i > 0) {//just since it would fail on first reading
       goodPulsesInRow = 0;
       Serial.println("FAIL!! starting count over");
+      delay(100);//extra delay to reset things
     }
     lastPulseCount = pulseCount;
     if (i == 19) {//all the way through and never found 5 good ones in a row
@@ -61,9 +70,6 @@ boolean getLMT01() {
       return false;
     }
   }
-  detachInterrupt(LMT01_Data_Pin);
-  pinMode(LMT01_Data_Pin, INPUT);
-
 
   float tempC = (pulseCount * 256.00 / 4096.00) - 50.00;
   float tempF = tempC * 9.00 / 5.00 + 32.00;
@@ -79,5 +85,7 @@ boolean getLMT01() {
     Serial.println("Sending  in F");
     dtostrf(tempF, 1, 2, temperatureString);//convert float to str
   }
+  Serial.print("ms to measure ");
+  Serial.println(millis() - getLMT01startTime);
   return true;
 }
